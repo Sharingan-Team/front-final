@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Objectif de la plateforme
 
-## Getting Started
+Fournir une solution B2B sécurisée de transfert de documents et de messages, fondée sur un modèle zero-knowledge :
 
-First, run the development server:
+    Garantir que seuls l’émetteur et le destinataire voient le contenu en clair.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+    Ne pas stocker ou manipuler de données sensibles en clair sur le serveur central.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+    Offrir un mécanisme simple de création et d’accès à des canaux privés, via un système de « magic link » à usage unique.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Fonctionnalités clés
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+    Gestion des utilisateurs
 
-## Learn More
+        Inscription et connexion via email + mot de passe (hachage sécurisé).
 
-To learn more about Next.js, take a look at the following resources:
+        Émission d’un token de session (JWT ou cookie) pour authentifier chaque requête.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+    Création de canal sécurisé
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+        L’utilisateur A génère un magic link unique, limité dans le temps et à un seul usage, lié à l’email/identifiant du destinataire B.
 
-## Deploy on Vercel
+        B colle ce lien dans l’interface : vérification de sa validité → création d’un Channel chiffré de bout en bout entre A et B.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+        Le lien est alors marqué comme utilisé et devient invalide.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+    Chiffrement client-side (end‐to‐end)
+
+        Hybride :
+
+            Chaque message/fichier est chiffré en AES-GCM côté client.
+
+            La clé AES est chiffrée pour chaque membre du canal avec sa clé publique (RSA-OAEP ou ECDH).
+
+        Le serveur ne reçoit ni ne stocke jamais de clé en clair, seulement les blobs chiffrés + métadonnées nécessaires (IV, tag, clés chiffrées).
+
+    Stockage décentralisé des données
+
+        Les blobs chiffrés (messages et fichiers) sont hébergés localement par chaque entreprise (A et B), sur leurs propres infrastructures.
+
+        La plateforme ne sert que d’annuaire d’utilisateurs, d’orchestrateur de canaux et de pont pour pointer vers ces blobs.
+
+    Accès et UX
+
+        Liste des canaux :
+
+            Pour A : tous les canaux qu’elle a créés ou auxquels elle a adhéré.
+
+            Pour B : seuls les canaux pour lesquels elle a utilisé un magic link valide.
+
+        Dans chaque canal, affichage des messages déchiffrés et possibilité de déposer/télécharger des fichiers en un clic.
+
+    Sécurité renforcée
+
+        Zero-knowledge : le backend ne peut pas déchiffrer le contenu.
+
+        Journal d’audit : chaque action critique (génération de lien, création de canal, upload, téléchargement) est horodatée et peut être exportée sous forme de log haché pour garantir l’intégrité.
+
+        Option MFA (WebAuthn/FIDO2) pour verrouiller l’accès à certains canaux sensibles.
+
+    Cycle de vie et maintenance
+
+        Magic links expirent automatiquement si non utilisés.
+
+        Possibilité pour un administrateur de révoquer l’accès à un canal ou de fermer un canal inactif.
+
+        Notifications paramétrables (par email ou webhook) lors de la création, de l’arrivée de nouveaux messages/fichiers, ou de l’expiration d’un canal.
+
+En résumé
+
+La plateforme permet à des entreprises de créer et gérer facilement des canaux sécurisés de partage de documents et messages, en s’appuyant sur un mécanisme de magic link pour instaurer une relation de confiance entre deux entités, tout en garantissant une confidentialité totale grâce à un chiffrement E2E et un stockage décentralisé des données.

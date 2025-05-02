@@ -1,0 +1,172 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated"
+}
+
+/// Utilisateur de la plateforme (login/password)
+
+model User {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  // Channels créés, memberships et actions
+  ownedChannels     Channel[]   @relation("ChannelOwner")
+  guestChannels     Channel[]   @relation("ChannelGuest")
+  magicLinksCreated MagicLink[] @relation("MagicLinkCreator")
+  magicLinksUsed    MagicLink[] @relation("MagicLinkTarget")
+  messagesSent      Message[]
+  filesUploaded     File[]
+  fileKeys          FileKey[]
+  email             String
+  emailVerified     Boolean
+  image             String?
+  updatedAt         DateTime
+  displayUsername   String?
+  sessions          Session[]
+  accounts          Account[]
+
+  name String
+
+  @@map("user")
+}
+
+/// Lien magique à usage unique donnant le droit de créer un canal sécurisé
+
+model MagicLink {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  used      Boolean  @default(false)
+
+  // Créateur du lien
+  createdBy   User   @relation("MagicLinkCreator", fields: [createdById], references: [id])
+  createdById String
+
+  // Utilisateur destinataire qui réclamera le canal
+  targetUser   User   @relation("MagicLinkTarget", fields: [targetUserId], references: [id])
+  targetUserId String
+
+  // Canal créé lors de l'utilisation du lien
+  channel   Channel? @relation(fields: [channelId], references: [id])
+  channelId Int?     @unique
+}
+
+/// Salon de discussion / canal E2E (direct messaging only)
+
+model Channel {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  // Owner of the channel
+  owner   User   @relation("ChannelOwner", fields: [ownerId], references: [id])
+  ownerId String
+
+  // Guest user in the channel
+  guest   User   @relation("ChannelGuest", fields: [guestId], references: [id])
+  guestId String
+
+  // Messages et fichiers
+  messages Message[]
+  files    File[]
+
+  // MagicLink unique lié à ce canal
+  magicLink MagicLink?
+
+  @@unique([ownerId, guestId])
+}
+
+/// Messages chiffrés échangés dans un canal
+
+model Message {
+  id        Int     @id @default(autoincrement())
+  channel   Channel @relation(fields: [channelId], references: [id])
+  channelId Int
+  sender    User    @relation(fields: [senderId], references: [id])
+  senderId  String
+
+  encryptedContent String // Blob chiffré (Base64 ou binaire)
+  createdAt        DateTime @default(now())
+}
+
+/// Fichiers chiffrés envoyés dans un canal
+
+model File {
+  id         Int     @id @default(autoincrement())
+  channel    Channel @relation(fields: [channelId], references: [id])
+  channelId  Int
+  uploader   User    @relation(fields: [uploaderId], references: [id])
+  uploaderId String
+
+  filename  String // Nom original du fichier
+  url       String // URL ou chemin vers le blob chiffré
+  size      Int // Taille du fichier en octets
+  mimeType  String // Type MIME du fichier (image/png, application/pdf, etc.)
+  createdAt DateTime @default(now())
+
+  // Clés symétriques chiffrées pour chaque destinataire
+  fileKeys FileKey[]
+}
+
+/// Clés symétriques (AES) chiffrées avec la clé publique de chaque utilisateur
+
+model FileKey {
+  id           Int    @id @default(autoincrement())
+  file         File   @relation(fields: [fileId], references: [id])
+  fileId       Int
+  user         User   @relation(fields: [userId], references: [id])
+  userId       String
+  encryptedKey String // Clé AES chiffrée (Base64)
+
+  @@unique([fileId, userId])
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
